@@ -1,0 +1,1 @@
+/mnt/m/_PHOTOBOOTH/photoboothdiy$ rsync -ru .* pi@192.168.50.74:/home/pi/photoboothdiy

@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
-import picamera
 import pygame
 import time
 import os
 import PIL.Image
-import RPi.GPIO as GPIO
 
 from threading import Thread
 from pygame.locals import *
 from time import sleep
 from PIL import Image, ImageDraw
+
+import sys
+
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 # initialise global variables
 Numeral = ""  # Numeral is the number display
@@ -22,8 +25,9 @@ TotalImageCount = 0  # Counter for Display and to monitor paper usage
 PhotosPerCart = 30  # Selphy takes 16 sheets per tray
 imagecounter = 0
 imagefolder = 'Photos'
-templatePath = os.path.join('Photos', 'Template', "template_own.png")  # Path of template image
+templatePath = os.path.join('Photos', 'Template', "template.png")  # Path of template image
 ImageShowed = False
+Printing = False
 BUTTON_PIN = 25
 # IMAGE_WIDTH = 558
 # IMAGE_HEIGHT = 374
@@ -33,13 +37,9 @@ IMAGE_HEIGHT = 360
 # Load the background template
 bgimage = PIL.Image.open(templatePath)
 
-# Setup GPIO
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
 # initialise pygame
 pygame.init()  # Initialise pygame
-pygame.mouse.set_visible(False)  # hide the mouse cursor
+
 infoObject = pygame.display.Info()
 screen = pygame.display.set_mode((infoObject.current_w, infoObject.current_h), pygame.FULLSCREEN)  # Full screen
 background = pygame.Surface(screen.get_size())  # Create the background object
@@ -51,16 +51,6 @@ backgroundPicture = background.convert()  # Convert it to a background
 
 transform_x = infoObject.current_w  # how wide to scale the jpg when replaying
 transfrom_y = infoObject.current_h  # how high to scale the jpg when replaying
-
-camera = picamera.PiCamera()
-# Initialise the camera object
-camera.resolution = (infoObject.current_w, infoObject.current_h)
-camera.rotation = 0
-camera.hflip = True
-camera.vflip = False
-camera.brightness = 50
-camera.preview_alpha = 120
-camera.preview_fullscreen = True
 
 
 # camera.framerate             = 24
@@ -118,24 +108,6 @@ def set_demensions(img_w, img_h):
         transform_y = infoObject.current_h
         offset_y = offset_x = 0
 
-
-def InitFolder():
-    global imagefolder
-    global Message
-
-    Message = 'Folder Check...'
-    UpdateDisplay()
-    Message = ''
-
-    # check image folder existing, create if not exists
-    if not os.path.isdir(imagefolder):
-        os.makedirs(imagefolder)
-
-    imagefolder2 = os.path.join(imagefolder, 'images')
-    if not os.path.isdir(imagefolder2):
-        os.makedirs(imagefolder2)
-
-
 def DisplayText(fontSize, textToDisplay):
     global Numeral
     global Message
@@ -152,8 +124,8 @@ def DisplayText(fontSize, textToDisplay):
         background.fill(pygame.Color("black"))
     if (textToDisplay != ""):
         # print(displaytext)
-        font = pygame.font.Font(None, fontSize)
-        text = font.render(textToDisplay, 1, (227, 157, 200))
+        font = pygame.font.Font("seguisym.ttf", fontSize)
+        text = font.render(textToDisplay, True, (227, 157, 200))
         textpos = text.get_rect()
         textpos.centerx = background.get_rect().centerx
         textpos.centery = background.get_rect().centery
@@ -186,7 +158,7 @@ def UpdateDisplay():
     if (Message != ""):
         # print(displaytext)
         font = pygame.font.Font("seguisym.ttf", 100)
-        text = font.render(Message, 1, (227, 157, 200))
+        text = font.render(str(Message).encode('utf-8'), True, (227, 157, 200))
         textpos = text.get_rect()
         textpos.centerx = background.get_rect().centerx
         textpos.centery = background.get_rect().centery
@@ -198,7 +170,7 @@ def UpdateDisplay():
     if (Numeral != ""):
         # print(displaytext)
         font = pygame.font.Font("seguisym.ttf", 800)
-        text = font.render(Numeral, 1, (227, 157, 200))
+        text = font.render(str(Numeral).encode('utf-8'), True, (227, 157, 200))
         textpos = text.get_rect()
         textpos.centerx = background.get_rect().centerx
         textpos.centery = background.get_rect().centery
@@ -210,7 +182,7 @@ def UpdateDisplay():
     if (CountDownPhoto != ""):
         # print(displaytext)
         font = pygame.font.Font("seguisym.ttf", 500)
-        text = font.render(CountDownPhoto, 1, (227, 157, 200))
+        text = font.render(str(CountDownPhoto).encode('utf-8'), True, (227, 157, 200))
         textpos = text.get_rect()
         textpos.centerx = background.get_rect().centerx
         textpos.centery = background.get_rect().centery
@@ -246,7 +218,7 @@ def ShowPicture(file, delay):
 
 # display one image on screen
 def show_image(image_path):
-    screen.fill(pygame.Color("black"))  # clear the screen
+    screen.fill(pygame.Color("white"))  # clear the screen
     img = pygame.image.load(image_path)  # load the image
     img = img.convert()
     set_demensions(img.get_width(), img.get_height())  # set pixel dimensions based on image
@@ -255,169 +227,10 @@ def show_image(image_path):
     screen.blit(img, (x, y))
     pygame.display.flip()
 
-
-def CapturePicture():
-    global imagecounter
-    global imagefolder
-    global Numeral
-    global Message
-    global screen
-    global background
-    global screenPicture
-    global backgroundPicture
-    global pygame
-    global ImageShowed
-    global CountDownPhoto
-    global BackgroundColor
-
-    BackgroundColor = ""
-    Numeral = ""
-    Message = ""
-    UpdateDisplay()
-    time.sleep(1)
-    CountDownPhoto = ""
-    UpdateDisplay()
-    background.fill(pygame.Color("black"))
-    screen.blit(background, (0, 0))
-    pygame.display.flip()
-    camera.start_preview()
-    BackgroundColor = "black"
-
-    for x in range(3, -1, -1):
-        if x == 0:
-            Numeral = ""
-            Message = u"Pózoljatok"
-        else:
-            Numeral = str(x)
-            Message = ""
-        UpdateDisplay()
-        time.sleep(1)
-
-    BackgroundColor = ""
-    Numeral = ""
-    Message = ""
-    UpdateDisplay()
-    imagecounter = imagecounter + 1
-    ts = time.time()
-    filename = os.path.join(imagefolder, 'images', str(imagecounter) + "_" + str(ts) + '.jpg')
-    camera.capture(filename, resize=(IMAGE_WIDTH, IMAGE_HEIGHT))
-    camera.stop_preview()
-    ShowPicture(filename, 2)
-    ImageShowed = False
-    return filename
-
-
-def TakePictures():
-    global imagecounter
-    global imagefolder
-    global Numeral
-    global Message
-    global screen
-    global background
-    global pygame
-    global ImageShowed
-    global CountDownPhoto
-    global BackgroundColor
-    global Printing
-    global PhotosPerCart
-    global TotalImageCount
-
-    input(pygame.event.get())
-    CountDownPhoto = "1/3"
-    filename1 = CapturePicture()
-
-    CountDownPhoto = "2/3"
-    filename2 = CapturePicture()
-
-    CountDownPhoto = "3/3"
-    filename3 = CapturePicture()
-
-    CountDownPhoto = ""
-    Message = u"Kérlek várj..."
-    UpdateDisplay()
-
-    image1 = PIL.Image.open(filename1)
-    image2 = PIL.Image.open(filename2)
-    image3 = PIL.Image.open(filename3)
-    TotalImageCount = TotalImageCount + 1
-
-    bgimage.paste(image1, (625, 30))
-    bgimage.paste(image2, (625, 410))
-    bgimage.paste(image3, (55, 410))
-    # Create the final filename
-    timestamp = time.time()
-    Final_Image_Name = os.path.join(imagefolder, "Final_" + str(TotalImageCount) + "_" + str(timestamp) + ".png")
-    # Save it to the usb drive
-    bgimage.save(Final_Image_Name)
-    # Save a temp file, its faster to print from the pi than usb
-    bgimage.save('/home/pi/Desktop/tempprint.png')
-    ShowPicture('/home/pi/Desktop/tempprint.png', 3)
-    bgimage2 = bgimage.rotate(90)
-    bgimage2.save('/home/pi/Desktop/tempprint.png')
-    ImageShowed = False
-    Message = u"Nyomd meg a gombot a feltöltéshez"
-    UpdateDisplay()
-    time.sleep(1)
-    Message = ""
-    UpdateDisplay()
-    Printing = False
-    WaitForPrintingEvent()
-    Numeral = ""
-    Message = u"Nézd meg a QR kódot a feltöltéshez"
-    Numeral = ""
-    UpdateDisplay()
-    time.sleep(1)
-
-    Message = ""
-    Numeral = ""
-    ImageShowed = False
-    UpdateDisplay()
-    time.sleep(1)
-
-
-def MyCallback(channel):
-    global Printing
-    GPIO.remove_event_detect(BUTTON_PIN)
-    Printing = True
-
-
-def WaitForPrintingEvent():
-    global BackgroundColor
-    global Numeral
-    global Message
-    global Printing
-    global pygame
-    countDown = 5
-    GPIO.add_event_detect(BUTTON_PIN, GPIO.RISING)
-    GPIO.add_event_callback(BUTTON_PIN, MyCallback)
-
-    while Printing == False and countDown > 0:
-        if (Printing == True):
-            return
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_DOWN:
-                    GPIO.remove_event_detect(BUTTON_PIN)
-                    Printing = True
-                    return
-        BackgroundColor = ""
-        Numeral = str(countDown)
-        Message = ""
-        UpdateDisplay()
-        countDown = countDown - 1
-        time.sleep(1)
-
-    GPIO.remove_event_detect(BUTTON_PIN)
-
-
 def WaitForEvent():
     global pygame
     NotEvent = True
     while NotEvent:
-        input_state = GPIO.input(BUTTON_PIN)
-        if input_state == False:
-            NotEvent = False
-            return
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -427,15 +240,12 @@ def WaitForEvent():
                     return
         time.sleep(0.2)
 
-
 def main(threadName, *args):
-    InitFolder()
     while True:
-        show_image('images/start_camera.jpg')
+        show_image('images/start_camera.png')
+        DisplayText(50, "Pózoljatok")
         WaitForEvent()
         time.sleep(0.2)
-        TakePictures()
-    GPIO.cleanup()
 
 
 # launch the main thread
